@@ -1,6 +1,6 @@
 # Author: Alexander Gerniers
 library("rscala")
-
+library("SingleCellExperiment")
 
 #' Initialises the RScala instance to run MicroCellClust.
 #' 
@@ -201,4 +201,19 @@ preprocessGenes = function(data, cellsOnCol = TRUE, type = "remove", thresh = 0.
   } else {
     data
   }
+}
+
+
+runAutomaticTuning = function(mcc.rs, data, nPairs = NULL) {
+  logData = log10(data + 0.1)
+  sce = SingleCellExperiment(assays = list(logcounts = as.matrix(logData)))
+  
+  mLOG = logcounts(sce)
+  proprecessedData = preprocessGenes(mLOG, thresh=0.25)
+  kappa = 100/ncol(proprecessedData)
+  mu = 0.1
+  results = runMCC(mcc.rs, proprecessedData,nPairs = nPairs, kappa = kappa, nNeg = mu)
+  
+  results
+  
 }

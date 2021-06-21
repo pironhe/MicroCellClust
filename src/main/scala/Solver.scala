@@ -74,13 +74,11 @@ object Solver {
         val t1 = System.currentTimeMillis
 
         if (verbose) {
-            //println("\t cellsPair: " + nPairs.toList)
             println("\t kappa value: "+ currentKappa)
             println("\t mu value: " + currentNNeg)
             println("\t NEW BEST: obj. val.: " + best._3)
             println("\t samples (idx. from 1): " + best._1.map(_ + 1).mkString(", "))
             println("\t nb. markers: " + best._2.length)
-            //println("\t obj. val. no penalty: " + best._4)
             println("\t Computation time [s]: " + ((t1 - t0).toDouble / 1000))
         }
         
@@ -102,13 +100,6 @@ object Solver {
         while ( !finished && (!numberGeneOk || !numberCellOk) && lvl <= maxLvl) {
             
             if(restartComputing){ 
-                println("NUMBER COMPUTATION: " + numberComputation)
-                //Compute markers, obj val and objval no neg again with new kappa and/or mu
-                //Keep the pairs of cell selected
-                //recup pair
-                //recalculer markers
-                //ajouter à nBestQueue
-                //quand recompute reinit lvl, noimprove
                 if(verbose){
                     println("\t value of mu : " + currentNNeg)
                     println("\t value of kappa : " + currentKappa)
@@ -180,15 +171,10 @@ object Solver {
                         println("\t NEW BEST: obj. val.: " + best._3)
                         println("\t samples (idx. from 1): " + best._1.map(_ + 1).mkString(", "))
                         println("\t nb. markers: " + best._2.length)
-                        //println("\t obj. val. no penalty: " + best._4)
                     }
                 } else {
                     noImprove += 1
                     if (noImprove >= stopNoImprove) {
-                        /*var cellMeanObjValue= best._4 / best._1.length
-                        var nbInterestingCells = getNumberInterstingCells(m, best._1, best._2, cellMeanObjValue)
-                        println("\t INSIDE cellMeanObjValue: "+ cellMeanObjValue)
-                        println("\t nbInterestingCells: "+ nbInterestingCells)*/
                         finished = true
                         if (verbose) {
                             println("\t No improvement after " + stopNoImprove + " levels: search stopped")
@@ -214,10 +200,8 @@ object Solver {
                         println("\t Inside NEW BEST Solution, obj val: " + best._3)
                     }
                 }
-                
-                println("\t RETVAL currnet: " + retVal)
                 solutionsSize += List(best._1.length, best._2.length, best._3.toInt)
-                if(numberComputation==10){
+                if(numberComputation==25){
                     finished = true
                 }else{
                     finished= false
@@ -260,52 +244,11 @@ object Solver {
                 }
             }
             
-            /*if(lvl>maxCelWanted){ // No need to go that far in the search
-                // Check number of cells in best solution to choose if need to increase or decrease nNeg
-                // best = (samples, markers, obj, objNoPenalty)
-                if( best._1.length < minCelWanted ){ //Need to increase nNeg
-                    var cellMeanObjValue= best._4 / best._1.length
-                    var nbInterestingCells = getNumberInterstingCells(m, best._1, best._2, cellMeanObjValue)
-                    currentNNeg *= 1.1
-                    restartComputing = true
-                    println("\t INSIDE cellMeanObjValue: "+ cellMeanObjValue)
-                    println("\t nbInterestingCells: "+ nbInterestingCells)
-                    lvl = 3
-                }else if( best._1.length > maxCelWanted ){ //Need to decrease nNeg
-                    lvl = 3
-                    currentNNeg = currentNNeg*0.9
-                    restartComputing = true
-                }else{
-                    numberCellOk = true
-                    println("\t Number Cells ok")
-                }
-            }
-            if(finished){
-                if( best._2.length < minMarkersWanted ){ //Need to reduce kappa
-                    currentKappa *= 0.9
-                    restartComputing = true
-                    lvl = 3
-                    finished = false
-                }else if( best._2.length > maxMarkersWanted ){ //Need to increase kappa
-                    currentKappa *= 1.1
-                    restartComputing = true
-                    lvl = 3
-                    finished = false
-                }else{
-                    numberGeneOk = true
-                    println("\t Number Markes ok")
-                }
-            }*/
-            
-            
-            
             val t1 = System.currentTimeMillis
             if (verbose) {
                 println("\t Computation time [s]: " + ((t1 - t0).toDouble / 1000))
             }
         }
-        
-        //Return the best solution which has a number of cell and markers inside the wanted area
         
         return (retVal._1,retVal._2,retVal._3,retVal._4,solutionsSize.toList)
     }
