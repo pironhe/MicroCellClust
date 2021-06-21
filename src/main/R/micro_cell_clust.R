@@ -36,9 +36,9 @@ estimateHeuristic = function(mcc.rs, data, cellsOnCol = TRUE, kappa = 1.0) {
   if (cellsOnCol) {
     data.matrix = t(data.matrix)
   }
-
+  
   res = mcc.rs(m = data.matrix, k = kappa) * 'Solver.evaluatePairs(m, k)'
-
+  
   pairs.id = mcc.rs(res = res) * 'res.map(x => x._1.map(_ + 1).mkString("-")).toArray'
   pairs.obj = mcc.rs(res = res) * 'res.map(_._2).toArray'
   names(pairs.obj) = pairs.id
@@ -61,26 +61,41 @@ estimateHeuristic = function(mcc.rs, data, cellsOnCol = TRUE, kappa = 1.0) {
 #'
 #' @return The cells and genes forming the bicluster, and its objective value
 #'
-runMCC = function(mcc.rs, data, cellsOnCol = TRUE, kappa = 1.0, nNeg = 0.1, maxNbCells = Inf, stopNoImprove = 25, minCoExpGenes = 0, nHeuristic = 20, verbose = T) {
+runMCC = function(mcc.rs, data, nPairs = NULL, cellsOnCol = TRUE, kappa = 1.0, nNeg = 0.1, maxNbCells = Inf, minNbCells = 0, maxNbGenes = Inf, minNbGenes = 0, stopNoImprove = 25, minCoExpGenes = 0, nHeuristic = 20, verbose = T) {
   data.matrix = as.matrix(data)
   if (cellsOnCol) {  # Scala implementation considers cells on rows and genes on columns
     data.matrix = t(data.matrix)
   }
-
-  res = mcc.rs(m = data.matrix, k = kappa, n = nNeg, mc = maxNbCells, sni = stopNoImprove, mg = minCoExpGenes, nh = nHeuristic, v = verbose) *
-  'Solver.findCluster(m, kappa = k, nNeg = n, maxNbSam = mc.toInt, stopNoImprove = sni.toInt, minCoExpMark = mg.toInt, nHeuristic = nh.toInt, verbose = v)'
-
+  
+  'maxCelWanted: Int= Int.MaxValue, minCelWanted: Int = 0,
+                    maxMarkersWanted: Int= Int.MaxValue, minMarkersWanted: Int = 0,'
+  
+  if(is.null(nPairs)){
+    res = mcc.rs(m = data.matrix, k = kappa, n = nNeg, maxC = maxNbCells, minC = minNbCells, maxM = maxNbGenes, minM = minNbGenes, sni = stopNoImprove, mg = minCoExpGenes, nh = nHeuristic, v = verbose) *
+      'Solver.findCluster(m, kappa = k, nNeg = n, maxCelWanted = maxC.toInt, minCelWanted = minC.toInt, maxMarkersWanted = maxM.toInt, minMarkersWanted = minM.toInt, stopNoImprove = sni.toInt, minCoExpMark = mg.toInt, nHeuristic = nh.toInt, verbose = v)'
+  }else{
+    nPairs.matrix = as.matrix(nPairs)
+    res = mcc.rs(m = data.matrix,np = nPairs.matrix, k = kappa, n = nNeg, maxC = maxNbCells, minC = minNbCells, maxM = maxNbGenes, minM = minNbGenes, sni = stopNoImprove, mg = minCoExpGenes, nh = nHeuristic, v = verbose) *
+      'Solver.findCluster(m,nP = np, kappa = k, nNeg = n, maxCelWanted = maxC.toInt, minCelWanted = minC.toInt, maxMarkersWanted = maxM.toInt, minMarkersWanted = minM.toInt, stopNoImprove = sni.toInt, minCoExpMark = mg.toInt, nHeuristic = nh.toInt, verbose = v)'
+    
+  }
+  
+  'findCluster(m: Array[Array[Double]], nNeg: Double = 0.1, kappa: Double = 1, maxCelWanted: Int= Int.MaxValue, minCelWanted: Int = 0, maxMarkersWanted: Int= Int.MaxValue, minMarkersWanted: Int = 0,nHeuristic: Int = 20,
+                    maxNbSam: Int = Int.MaxValue, stopNoImprove: Int = 25, minCoExpMark: Int = 0,
+                    excl: List[Int] = List(), verbose: Boolean = true):'
   clust.cells = mcc.rs(res = res) * 'res._1.map(_ + 1).toArray'
   clust.genes = mcc.rs(res = res) * 'res._2.map(_ + 1).toArray'
   clust.obj = mcc.rs(res = res) * 'res._3'
-
+  clust.pairs = mcc.rs(res = res) * 'res._4.map(x => x.toArray).toArray'
+  clust.sizes = mcc.rs(res = res) * 'res._5.map(x => x.toArray).toArray'
+  
   if (cellsOnCol) {
-    res.lst = list(clust.cells, colnames(data)[clust.cells], clust.genes, rownames(data)[clust.genes], clust.obj)
-    names(res.lst) = c("cells.idx", "cells.names", "genes.idx", "genes.names", "obj.value")
+    res.lst = list(clust.cells, colnames(data)[clust.cells], clust.genes, rownames(data)[clust.genes], clust.pairs, clust.obj, clust.sizes)
+    names(res.lst) = c("cells.idx", "cells.names", "genes.idx", "genes.names", "bestpairs", "obj.value", "clust.sizes")
     res.lst
   } else {
-    res.lst = list(clust.cells, rownames(data)[clust.cells], clust.genes, colnames(data)[clust.genes], clust.obj)
-    names(res.lst) = c("cells.idx", "cells.names", "genes.idx", "genes.names", "obj.value")
+    res.lst = list(clust.cells, rownames(data)[clust.cells], clust.genes, colnames(data)[clust.genes], clust.pairs, clust.obj, clust.sizes)
+    names(res.lst) = c("cells.idx", "cells.names", "genes.idx", "genes.names", "bestpairs", "obj.value", "clust.sizes")
     res.lst
   }
 }
@@ -107,14 +122,14 @@ runMCC.exclude = function(mcc.rs, data, excl, cellsOnCol = TRUE, kappa = 1.0, nN
   if (cellsOnCol) {  # Scala implementation considers cells on rows and genes on columns
     data.matrix = t(data.matrix)
   }
-
+  
   res = mcc.rs(m = data.matrix, excl, k = kappa, n = nNeg, mc = maxNbCells, sni = stopNoImprove, mg = minCoExpGenes, nh = nHeuristic, v = verbose) *
-  'Solver.findCluster(m, kappa = k, nNeg = n, maxNbSam = mc.toInt, stopNoImprove = sni.toInt, minCoExpMark = mg.toInt, nHeuristic = nh.toInt, excl = excl.map(_.toInt - 1).toList, verbose = v)'
-
+    'Solver.findCluster(m, kappa = k, nNeg = n, maxNbSam = mc.toInt, stopNoImprove = sni.toInt, minCoExpMark = mg.toInt, nHeuristic = nh.toInt, excl = excl.map(_.toInt - 1).toList, verbose = v)'
+  
   clust.cells = mcc.rs(res = res) * 'res._1.map(_ + 1).toArray'
   clust.genes = mcc.rs(res = res) * 'res._2.map(_ + 1).toArray'
   clust.obj = mcc.rs(res = res) * 'res._3'
-
+  
   if (cellsOnCol) {
     res.lst = list(clust.cells, colnames(data)[clust.cells], clust.genes, rownames(data)[clust.genes], clust.obj)
     names(res.lst) = c("cells.idx", "cells.names", "genes.idx", "genes.names", "obj.value")
@@ -142,13 +157,13 @@ getGenes = function(mcc.rs, data, cells.idx, cellsOnCol = TRUE, kappa = 1.0, nNe
   if (cellsOnCol) {
     data.matrix = t(data.matrix)
   }
-
+  
   res = mcc.rs(m = data.matrix, c = cells.idx, k = kappa, n = nNeg) *
-  'Objective.getMarkers(m, c.map(_.toInt - 1).toList, Objective.buildExprMap(m), Objective.getMarkSum(m), kappa = k, nNeg = n)'
-
+    'Objective.getMarkers(m, c.map(_.toInt - 1).toList, Objective.buildExprMap(m), Objective.getMarkSum(m), kappa = k, nNeg = n)'
+  
   clust.genes = mcc.rs(res = res) * 'res._1.map(_ + 1).toArray'
   clust.obj = mcc.rs(res = res) * 'res._2'
-
+  
   if (cellsOnCol) {
     res.lst = list(clust.genes, rownames(data)[clust.genes], clust.obj)
     names(res.lst) = c("genes.idx", "genes.names", "obj.value")

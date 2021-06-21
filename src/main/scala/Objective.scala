@@ -19,15 +19,16 @@ object Objective {
       *         - the corresponding objective value
       */
     def getMarkers(m: Array[Array[Double]], samples: List[Int], expr: Map[Int, List[Int]], markSum: Array[Double],
-                   nNeg: Double = 0.1, kappa: Double = 1): (List[Int], Double) = {
+                   nNeg: Double = 0.1, kappa: Double = 1): (List[Int], Double, Double) = {
         val markExpr = samples.flatMap(expr(_))
 
         val candidateMarks = markExpr.groupBy(identity)
-                .map(j => (j._1, samples.length - j._2.size, getMarkObj(m, samples, j._1, markSum, kappa)))
-                .toList.filter(j => j._3 >= 0 && j._2 <= ceil(samples.length * nNeg)).sortBy(j => (j._2, -j._3))
+                .map(j => (j._1, samples.length - j._2.size, (getMarkObj(m, samples, j._1, markSum, kappa))))
+                .toList.filter(j => j._3._1 >= 0 && j._2 <= ceil(samples.length * nNeg)).sortBy(j => (j._2, -j._3._1))
 
         val markers = new ListBuffer[Int]
         var obj = 0.0
+        var objNoPenalty = 0.0
         var finished = false
         var n = 0.0
         var j = 0
@@ -36,12 +37,13 @@ object Objective {
             if ((n + mark._2) / (samples.length * (markers.length + 1)) <= nNeg) {
                 markers += mark._1
                 n += mark._2
-                obj += mark._3
+                obj += mark._3._1
+                objNoPenalty += mark._3._2
                 j += 1
             } else finished = true
         }
 
-        return (markers.toList, obj)
+        return (markers.toList, obj, objNoPenalty)
     }
 
     /**
@@ -91,15 +93,19 @@ object Objective {
       * @param kappa a weighting constant for the out-of-cluster expression
       * @return the objective value
       */
-    def getMarkObj(m: Array[Array[Double]], samples: List[Int], marker: Int, markSum: Array[Double], kappa: Double = 1): Double = {
+    def getMarkObj(m: Array[Array[Double]], samples: List[Int], marker: Int, markSum: Array[Double], kappa: Double = 1): (Double,Double) = {
         var obj = - kappa * markSum(marker)
-
+        var objNoPenalty = 0.0
         for (i <- samples) {
-            if (m(i)(marker) >= 0) obj += (1 + kappa) * m(i)(marker)
+            if (m(i)(marker) >= 0){
+                obj += (1 + kappa) * m(i)(marker)
+                objNoPenalty += m(i)(marker)
+            }
+            
             else obj += m(i)(marker)
         }
 
-        return obj
+        return (obj, objNoPenalty)
     }
 
     /**
@@ -208,4 +214,73 @@ object Objective {
 
         return interMarks.toList.sorted
     }
+    
+    
+    /**
+     * Get the objective value of a specific sample given given a List of markers
+     * 
+     * @param m an expression matrix with samples (cells) on the rows and markers (genes) on the columns
+     * @param sample a sample of which we want the objective value
+     * @param markers the set of markers on which the objective value should be computed
+     * @return the objective value of sample on the given markers
+     * 
+     */
+    def getSampleObj(m: Array[Array[Double]], sample: Int, markers: List[Int]): Double = {
+        var obj = 0.0
+        
+        for ( j <-markers ) {
+            obj += m(sample)(j)
+        }
+        
+        return obj
+      
+    }
+    
+    def getObjNoPenalty(m: Array[Array[Double]], samples: List[Int], markers: List[Int]): Double = {
+        var obj = 0.0
+        
+        for ( j <-markers ) {
+          for (i <- samples){
+            obj += m(i)(j)
+          }            
+        }
+        
+        return obj
+      
+    }
+    
+    def getNumberInterstingCells(m: Array[Array[Double]], samples : List[Int], markers: List[Int], cellsMeanObj: Double): Int = {
+        var counter = 0
+        for (i <- m.indices) {
+            if (!samples.contains(i)){
+                var sum = 0.0
+                for (j <- markers) {
+                    sum += m(i)(j)
+                }
+                //println("\t SUM: " + sum)
+                if( sum > cellsMeanObj*0.3) counter+=1
+            }
+            
+        }
+        return counter
+
+    }
+    
+    def getNumberNotInterstingCellsInClust(m: Array[Array[Double]], samples : List[Int], markers: List[Int], cellsMeanObj: Double): Int = {
+        var counter = 0
+        for (i <- m.indices) {
+            if (samples.contains(i)){
+                var sum = 0.0
+                for (j <- markers) {
+                    sum += m(i)(j)
+                }
+                //println("\t SUM: " + sum)
+                if( sum <= cellsMeanObj*0.3) counter+=1
+            }
+            
+        }
+        return counter
+
+    }
+    
 }
